@@ -1,25 +1,109 @@
-# NASA_Internship_ADS_Summarization
-Summarization model for ADS_search program developed in tandem with NASA HQ and other interns during Fall 2023
+# Expertise Finder v3.0: Scientific Paper Summarization Pipeline
 
-**Purpose:** This repository is the result of my Fall 2023 Internship with NASA HQ. The goal was the enhance tools that have been created by previous interns that will enable NASA Headquarters Astrophysics Program Scientists to identify the expertise of potential peer reviewers based on their publication history through the NASA ADS archive. 
+## Overview
 
-The goal of creating this expertise finder is to use the tool to find possible reviewers at underserved and small research insitutions that normally do not particpate in the proposal process. Our hope is that by directly reaching out to subject matter experts at these insitutions, we can divserify the overall pool of applicants to NASA Astrophysics funds in the future. 
+This system processes a CSV file containing author publication information, downloads full paper texts, generates summaries, performs n-gram analysis, and outputs comprehensive results.
 
-This code represents an enhanced version of Expertise Finder v2.0, developed by Mallory Helfenbein (https://github.com/MalloryHelfenbein/NASA_Internship) and Máire Volz (https://github.com/maireav/NASA-Internship). The results of Expertise Finder v2.0 must be used for this code to function properly.
+## Prerequisites
 
-The purpose of enhancing the expertise finder is to reduce the potential of missing vital information regarding authors areas of expertise. By summarizing the entirity of published papers, and combining that information for a given author, the user can develop a more in depth underestanding of their expertise, that may have been missed by reviewing only the abstracts. 
+- Python 3.x
+- pip package manager
 
-The LLM and Pre-trained model used for summarization purposes https://huggingface.co/pszemraj/led-large-book-summary
+## Setup Instructions
 
-Dataset used for training https://huggingface.co/datasets/kmfoda/booksum
+### 1. Install Required Packages
 
-**What this code does:** The main function of this code is to summarize arXiv published papers via the results of Expertise Finder v2.0. From there, the final dataframe includes the original n-grams, bi-grams and tri-grams associated with the abstracts, along with the concated summaries, and the summary n-grams, bi-grams and tri-grams. The program accesses arXiv, and huggingface where a pre-trained model is pulled from. The huggingface model is currently open-source and does not require a huggingface API token. The user is able to run this code to develop a deeper understanding of authors areas of expertise for the purpose of reviewing grant and funding proposals. 
+Install dependencies using the provided `requirements.txt`:
 
-**What the User Needs:** The user needs to access Expertise Finder v2.0 (https://github.com/MalloryHelfenbein/NASA_Internship) and follow the README files instructions. 
+```bash
+pip install -r requirements.txt
+```
 
-**Current Files**
-- TextAnalysis.py: Python file with functions that determine top n-grams, bi-grams and tri-grams for each authors publication history. This finds the frequency of the appearance of the words in a given set of text. 
-- stopwords.txt: Text file with a list of stop words for language processing, so that common everyday words aren't included in the results of the TextAnalysis functions. Several words were added to this file following the work of Helfenbein et al. 2023, to account for common words appearing in the summarization model results. 
-- ADS_Summarization.ipynb: A notebook that contains the steps and instructions for the summarization process. 
+Download NLTK resources:
+```python
+import nltk
+nltk.download('punkt')
+nltk.download('wordnet')
+```
 
-**Warnings, Notes, and Recommendations:** The code should be run on a GPU runtime, otherwise the runtime will drastically increase, and potentially crash on CPU. It is recommended that the user processes under 100 papers per summarization run, due to extended runtime and GPU limits. 100 papers would take a user approximately 1-2 hours to run fully, depending on GPU capabilities. 
+### 2. Download Pre-trained Models
+
+Edit `model_downloader.py`:
+```python
+username = "your_username"  # Replace with your username
+base_dir = f"/nobackup/{username}/models"
+models = [
+    "pszemraj/led-large-book-summary",
+    "meta-llama/Llama-3.1-8B",
+    # Add other model IDs here
+]
+```
+
+Run the downloader:
+```bash
+python model_downloader.py
+```
+
+### 3. Prepare Input Data
+
+Requirements for input CSV:
+- Must contain an "Identifier" column
+- Identifier column should contain lists of arXiv IDs
+- Use single quotes for arXiv IDs (e.g., `['arXiv:2310.12345']`)
+
+Create `stopwords.txt` with words to exclude from n-gram analysis.
+
+### 4. Configure Model in Jupyter Notebook
+
+In `main_pipeline.ipynb`, directly pass model parameters to the `generate_summary()` function:
+
+```python
+# Define paths to your downloaded model and its configuration
+model_path = "./models/led-large-book-summary"
+config_path = "./model_configs/led-large-book-summary_config.json"
+
+# Prepare the list of papers to summarize
+papers = [paper1_text, paper2_text, ...]
+
+# Generate summaries by passing model paths and papers directly
+summary = generate_summary(
+    model_path=model_path, 
+    config_path=config_path, 
+    papers=papers
+)
+```
+
+**Key Parameters:**
+- `model_path`: Full path to the downloaded model directory
+- `config_path`: Full path to the model's configuration JSON file
+- `papers`: List of paper texts to summarize
+
+**Important Considerations:**
+- Ensure the paths point to the correct model and configuration files
+- The function expects a list of paper texts as input
+- Different model types (seq2seq vs. causal) may require different handling in the `generate_summary()` function
+
+### 5. Run the Pipeline
+
+Execute all cells in `main_pipeline.ipynb`.
+
+## Output
+
+The script generates `combined_output.csv` with:
+- Original input data
+- `summaries`: Concatenated paper summaries
+- `topwords`: Top 10 unigrams
+- `topbigrams`: Top 10 bigrams
+- `toptrigrams`: Top 10 trigrams
+
+## Notes
+
+- Download and processing may take significant time
+- Ensure sufficient disk space for model downloads
+- Monitor notebook output for progress and errors
+
+## Troubleshooting
+
+- Verify file paths
+- Check model download completeness
+- Ensure NLTK resources are correctly installed
