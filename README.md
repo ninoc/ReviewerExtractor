@@ -1,5 +1,7 @@
 # ReviewerExtractor
 This repository contains the main code for the Reviewer Extractor ([Volz et al., 2024](https://ui.adsabs.harvard.edu/abs/2024RNAAS...8...69V/abstract) ).<br>
+A new article is forthcoming (Samal et al. 2025) describing the Version 3 new features.
+Please utilize [this version of the code](https://github.com/ninoc/ReviewerExtractor/tree/main/codeV3).
 
 **Purpose**
 
@@ -15,7 +17,7 @@ of the indivuals' full publication record.
 This repositories contains different versions of the previous work done by Máire Volz see [Github repository](https://github.com/maireav/NASA-Internship).
 
 
-In the [examples](https://github.com/ninoc/ReviewerExtractor/blob/main/codeV2/ADS_search.ipynb), we provide a methods of finding experts in specific matters independent from their institutions. 
+In the [examples](https://github.com/ninoc/ReviewerExtractor/blob/main/codeV3/ADS_search.ipynb) we provide a methods of finding experts in specific matters independent from their institutions. 
 
 **Under the hood** 
 
@@ -25,7 +27,7 @@ The Expertise Finder accesseses [NASA ADS](https://ui.adsabs.harvard.edu/) throu
 The routines, snippets, and main code were developed by NASA Headquarters interns in the 2022-2023 internship period: 
 * The [version 1](https://github.com/ninoc/ReviewerExtractor/tree/main/codeV1) was developed by Máire Volz during her internship at NASA HQ in 2022-2023. 
 * The [version 2](https://github.com/ninoc/ReviewerExtractor/tree/main/codeV2) was developed by several other NASA HQ interns, including Mallory Helfenbein (NASA HQ intern 2023).
-* The [version 3](https://github.com/ninoc/ReviewerExtractor/tree/main/codeV3) was developed by Iizalaarab Elhaimeur in 2024 and it is the **most updated** version of the coee.
+* The [version 3](https://github.com/ninoc/ReviewerExtractor/tree/main/codeV3) was developed by Iizalaarab Elhaimeur and Sayem Kamal in 2024 and 2025 and it is the **most updated** version of the coee.
 * The [LLM summarization model](https://github.com/ninoc/ReviewerExtractor/tree/main/LLM) was developed by Isabelle Hoare (NASA HQ intern 2023), modified in Version 3.
 * The [GUIs](https://github.com/ninoc/ReviewerExtractor/tree/main/GUIs) were developed by Kaniyah Harris (NASA HQ intern 2023).
 
@@ -44,8 +46,8 @@ Some files are needed to run the actual search, while others are utilized in pos
 # Code citation
 The [version 1](https://github.com/ninoc/ReviewerExtractor/tree/main/codeV1) was presented at the American Astronomical Society in June 2023 [Volz et al. 2023](https://ui.adsabs.harvard.edu/abs/2023AAS...24210207V/abstract).
 
-The Version 2, is presented in a publication by [Volz et al., 2024](https://ui.adsabs.harvard.edu/abs/2024RNAAS...8...69V/abstract).
-
+The Version 2 is presented in a publication by [Volz et al., 2024](https://ui.adsabs.harvard.edu/abs/2024RNAAS...8...69V/abstract).
+The Version 3 implementation will be describe in an incoming paper (Kamal et al. 2025).
 
 **Credits** 
 - Máire Volz
@@ -53,6 +55,7 @@ The Version 2, is presented in a publication by [Volz et al., 2024](https://ui.a
 - Isabelle Hoare
 - Kaniyah Harris
 - Iizalaarab Elhaimeur
+- Sayem Kamal
 - Antonino Cucchiara, PhD
   
 # Contact information
