@@ -13,6 +13,7 @@ import time
 
 import pandas as pd
 
+##############################    TEST Version August, 20, 2025 ####################
 
 def do_search(auth_name, inst, t, q):
     """
@@ -78,33 +79,7 @@ def format_year(year):
     else:
         raise ValueError("Year must be an integer, float, or a string representing a year or a year range.")
 
-def get_similar_institution(original, institutions_file="exceptions.xlsx", threshold=75):
-    """
-    Given an original institution name and a file containing exception mappings,
-    first checks if the faulty name is present in the 'replace' column.
-    If found, returns the corresponding value from the 'replacement' column.
-    Otherwise, returns the most similar name from the 'replacement' column if the
-    similarity score meets the threshold.
-    
-    The file can be an Excel or CSV file.
-    """
-    try:
-        if institutions_file.lower().endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(institutions_file)
-        else:
-            df = pd.read_csv(institutions_file)
-        exact_matches = df[df["replace"].astype(str).str.lower() == original.lower()]
-        if not exact_matches.empty:
-            return exact_matches.iloc[0]["replacement"]
-        correct_names = df["replacement"].dropna().tolist()
-        best_match, score, _ = process.extractOne(original, correct_names, scorer=fuzz.ratio)
-        if score >= threshold:
-            return best_match
-        else:
-            return None
-    except Exception as e:
-        print("Error reading similar institution file:", e)
-        return None
+
 
 
 
@@ -128,6 +103,7 @@ def ads_search(name=None, institution=None, year=None, refereed='property:notref
     if year:
         years = format_year(year)
         query_parts.append(f'pubdate:{years}')
+    
 
     if not query_parts:
         print("You did not give me enough to search on, please try again.")
@@ -143,7 +119,7 @@ def ads_search(name=None, institution=None, year=None, refereed='property:notref
         "rows": 3000,
         "sort": "date desc"
     })
-
+    
     try:
         print('I am now querying ADS.\n')
         results = requests.get(
@@ -176,29 +152,9 @@ def ads_search(name=None, institution=None, year=None, refereed='property:notref
         })
         df = do_search(name, institution, token, encoded_query)
         if df.empty:
-            similar_inst = get_similar_institution(institution, institutions_file="exceptions.xlsx")
-            if similar_inst:
-                print(f"DataFrame still empty! Finding from exception list: {similar_inst}")
-                new_query_parts = []
-                for part in query_parts:
-                    if f'pos(institution:"{institution}",1)' in part:
-                        new_query_parts.append(f'pos(aff:"{similar_inst}",1)')
-                    else:
-                        new_query_parts.append(part)
-                new_query = " AND ".join(new_query_parts)
-                print(f"Alternative query using exception list:\n{new_query}\n")
-                encoded_query = urlencode({
-                    "q": new_query,
-                    "fl": "title, first_author, bibcode, abstract, aff, pubdate, keyword, identifier",
-                    "fq": "database:astronomy," + str(refereed),
-                    "rows": 3000,
-                    "sort": "date desc"
-                })
-                df = do_search(name, similar_inst, token, encoded_query)
-                df["Input Institution"] = institution
-            else:
-                print("No similar institution found using exception list")
-    
+            print('DataFrame is empty! PLEASE CHECK THE ADS CATALOG OF INSTITUTIONS FOR THE CORRECT INPUT')
+
+            
     if institution and deep_dive:
         if not df.empty:
             unique_authors = df["Input Author"].unique().tolist()
@@ -213,6 +169,7 @@ def ads_search(name=None, institution=None, year=None, refereed='property:notref
                     token=token,
                     stop_dir=stop_dir,
                     second_auth=second_auth,
+                    refereed=refereed,
                     groq_analysis=False,
                     deep_dive=False  
                 )
@@ -355,7 +312,7 @@ def get_user_input(dataframe):
             print("Error getting input. Please try again.")
     
     print(f"You are running '{search_type}' search.\n")
-    print("Listed are the available columns from your dataset:", ", ".join(dataframe.columns))
+    print("These are the available columns from your dataset:", ", ".join(dataframe.columns))
     search_params = {'search_type': search_type}
     
     if search_type == 'name':
@@ -381,7 +338,12 @@ def get_user_input(dataframe):
             search_params['institution_column'] = "Institution"
         run_deep = input("Do you want to run a deep dive search (re-run for each author) for institution search? (y/n) [n]: ").strip().lower() or "n"
         search_params['deep_dive'] = (run_deep == "y")
-    
+        while True:
+            include_second = input("Do you want to include search by second author? (y/n) [n]: ").strip().lower() or "n"
+            if include_second in ["y", "n"]:
+                break
+            print("Invalid choice. Please enter 'y' or 'n'.")
+        search_params['second_author'] = (include_second == "y")
         
     year_range = input("Enter the year range for your search (format: [YYYY TO YYYY] or a 4-digit year, default: [2003 TO 2030]): ").strip() or "[2003 TO 2030]"
     search_params['year_range'] = year_range
@@ -398,7 +360,8 @@ def get_user_input(dataframe):
     return search_params
 
 
-def run_file_search(filename, token, stop_dir):
+def run_file_search(filename,  token, stop_dir,year=None, second_auth=False,
+                        refereed='property:notrefereed OR property:refereed'):
     """
     Runs ADS search based on user's search type (name or institution).
     
@@ -420,13 +383,13 @@ def run_file_search(filename, token, stop_dir):
             data1 = ads_search(
                 name=name,
                 institution=None,
-                year=search_params['year_range'],
+                year=search_params.get('year_range', False),
                 token=token,
                 stop_dir=stop_dir,
                 second_auth=second_auth,
-                groq_analysis=False,
-                deep_dive=False,
-                refereed=search_params.get('refereed')
+                groq_analysis=search_params.get('groq_analysis', False),
+                deep_dive=search_params.get('deep_dive', False),
+                refereed=search_params.get('refereed', False)
             )
             search_identifier = f"name: {name} (including {'second' if second_auth else 'only first'} author)"
             if not data1.empty:
@@ -443,14 +406,15 @@ def run_file_search(filename, token, stop_dir):
         for i in range(len(dataframe)):
             inst = dataframe[search_params['institution_column']][i]
             print(f"Processing institution: {inst}")
+            second_auth = search_params.get('second_author', False)
             data = ads_search(
                 name=None,
                 institution=inst,
-                year=search_params['year_range'],
+                year=search_params.get('year_range', False),
                 token=token,
                 stop_dir=stop_dir,
-                second_auth=False,
-                groq_analysis=False,
+                second_auth=second_auth,
+                groq_analysis=search_params.get('groq_analysis', False),
                 deep_dive=search_params.get('deep_dive', False),
                 refereed=search_params.get('refereed')
             )
