@@ -1,5 +1,10 @@
-**NEW FEATURES IN V3 (June 2025)**
+**NEW FEATURES IN V4 (March 2026)**
+In version 4 of the code we incorporated new functionality, improve speed, and retired some others that became obsolete.
+Also, with the advent of Generative AI, we decided to discontinue the usage of local LLM, and we now provide a roadmap to use the output of ExperiseFinder with existing GenAI tools (e.g. Gemini, Copilot, etc...).
 
+
+
+**Old Version updates**
 In version 3 of the ReviewerExtractor we implemented a few optional keywords that expand the codebase functionalities. We also further implement the usage of LLM for ingesting not just the abstract but the whole publication by single authors (see LLM section).
 - **[second_auth]**: this optional keyword allows the user to search for researcher's publications using their name as first OR second authors. This can be useful for researchers that mentor early career colleagues and therefore may have a lower volume of first-author papers. (Default = False)
 - **[groq_analysis]** : this optional keywords utilizes Groq AI to match the result of the N-grams with the list of [AAS astronomical journal keywords](https://journals.aas.org/keywords-2013/). If requested the output will contain a new column called "Subtopics". **This can be a very slow process** (Default = False)
