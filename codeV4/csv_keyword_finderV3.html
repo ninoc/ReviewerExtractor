@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>CSV Keyword Finder (No Server)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root {
+      --gap: 12px;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      margin: 2rem;
+    }
+
+    h1 {
+      margin: 0 0 0.5rem;
+    }
+
+    .row {
+      display: flex;
+      gap: var(--gap);
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    label {
+      font-weight: 600;
+      display: block;
+    }
+
+    input[type="text"],
+    select {
+      padding: 6px 8px;
+      min-width: 280px;
+    }
+
+    input[type="file"] {
+      padding: 6px 8px;
+    }
+
+    button {
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #columns {
+      margin-top: 0.5rem;
+    }
+
+    .pill {
+      padding: 4px 8px;
+      border: 1px solid #ccc;
+      border-radius: 999px;
+      margin: 3px 6px 3px 0;
+      display: inline-block;
+    }
+
+    .pill input {
+      margin-right: 6px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 1rem;
+    }
+
+    th,
+    td {
+      border: 1px solid #ddd;
+      padding: 6px;
+      vertical-align: top;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #fafafa;
+      z-index: 1;
+    }
+
+    #stats {
+      margin-top: 0.5rem;
+    }
+
+    #pager {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-top: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .muted {
+      color: #666;
+    }
+
+    .small {
+      font-size: 0.92rem;
+    }
+
+    .danger {
+      color: #a00;
+    }
+
+    .ok {
+      color: #0a0;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    #dropzone {
+      border: 2px dashed #bbb;
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      margin: 10px 0;
+    }
+
+    #dropzone.dragover {
+      border-color: #3a7;
+      background: #f7fff9;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>CSV Keyword Finder</h1>
+    <p class="muted small">Single-file, browser-only. No server or external libraries.</p>
+
+    <!-- Upload -->
+    <div class="row">
+      <div>
+        <label for="fileInput">Upload CSV</label>
+        <input type="file" id="fileInput" accept=".csv" />
+      </div>
+      <div>
+        <button id="loadBtn">Load</button>
+      </div>
+      <div class="muted small" id="fileInfo"></div>
+    </div>
+
+    <div id="dropzone" aria-label="Drop CSV file here">Drag & drop CSV file here</div>
+
+    <!-- Search Controls -->
+    <div id="searchPanel" style="display:none;">
+      <div class="row" style="margin-bottom: 24px;">
+        <div>
+          <label for="keywords">Keywords (comma-separated)</label>
+          <input type="text" id="keywords" placeholder="e.g., XRISM, physics" />
+        </div>
+        <div>
+          <label for="matchMode">Match mode</label>
+          <select id="matchMode">
+            <option value="ANY">ANY — row matches if any keyword appears</option>
+            <option value="ALL">ALL — every keyword must appear</option>
+            <option value="PHRASE">PHRASE — exact phrase must appear</option>
+          </select>
+        </div>
+        <div>
+          <label><input type="checkbox" id="caseSensitive" /> Case sensitive</label>
+        </div>
+        <div style="position: relative;">
+          <label><input type="checkbox" id="earlyCareerToggle" autocomplete="off" /> Early career only</label>
+          <div class="muted small"
+            style="position: absolute; top: 100%; left: 0; margin-top: 4px; width: 280px; line-height: 1.2;">
+            *May be inaccurate if excluding pre-2010 data.
+          </div>
+        </div>
+        <div>
+          <label for="pageSize">Rows per page</label>
+          <select id="pageSize">
+            <option>50</option>
+            <option selected>100</option>
+            <option>250</option>
+            <option>500</option>
+          </select>
+        </div>
+        <div>
+          <button id="searchBtn">Search</button>
+        </div>
+        <div>
+          <button id="exportBtn">Export matched CSV</button>
+        </div>
+      </div>
+
+      <div id="columns"></div>
+      <div id="stats" class="small"></div>
+      <div id="pager"></div>
+      <div id="results"></div>
+    </div>
+  </div>
+
+  <script>
+    // ---------------------------
+    // Minimal CSV parser (quoted fields, commas, newlines).
+    // Handles standard RFC4180-ish CSV. For extremely irregular files, pre-clean if needed.
+    // ---------------------------
+    function parseCSV(text) {
+      const rows = [];
+      let row = [];
+      let i = 0, token = '', inQuotes = false;
+
+      const pushToken = () => { row.push(token); token = ''; };
+      const pushRow = () => { rows.push(row); row = []; };
+
+      while (i < text.length) {
+        const ch = text[i];
+
+        if (inQuotes) {
+          if (ch === '"') {
+            // Lookahead for escaped quote
+            if (text[i + 1] === '"') { token += '"'; i += 2; continue; }
+            inQuotes = false; i++; continue;
+          } else {
+            token += ch; i++; continue;
+          }
+        } else {
+          if (ch === '"') { inQuotes = true; i++; continue; }
+          if (ch === ',') { pushToken(); i++; continue; }
+          if (ch === '\r') { i++; continue; } // ignore CR
+          if (ch === '\n') { pushToken(); pushRow(); i++; continue; }
+          token += ch; i++; continue;
+        }
+      }
+      // last token/row
+      pushToken();
+      // if file ended without trailing newline, push final row
+      if (row.length > 1 || (row.length === 1 && row[0] !== '')) pushRow();
+
+      return rows;
+    }
+
+    // ---------------------------
+    // App state
+    // ---------------------------
+    let headers = [];
+    let rows = [];        // array of arrays, excluding header
+    let fileName = '';
+    let page = 0;
+
+    const fileInput = document.getElementById('fileInput');
+    const loadBtn = document.getElementById('loadBtn');
+    const dropzone = document.getElementById('dropzone');
+
+    const searchPanel = document.getElementById('searchPanel');
+    const keywordsEl = document.getElementById('keywords');
+    const matchModeEl = document.getElementById('matchMode');
+    const caseSensitiveEl = document.getElementById('caseSensitive');
+    const earlyCareerToggleEl = document.getElementById('earlyCareerToggle');
+    const pageSizeEl = document.getElementById('pageSize');
+
+    const columnsDiv = document.getElementById('columns');
+    const resultsDiv = document.getElementById('results');
+    const pagerDiv = document.getElementById('pager');
+    const statsDiv = document.getElementById('stats');
+    const fileInfoDiv = document.getElementById('fileInfo');
+
+    const searchBtn = document.getElementById('searchBtn');
+    const exportBtn = document.getElementById('exportBtn');
+
+    // Drag & drop
+    ['dragenter', 'dragover'].forEach(evt =>
+      dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('dragover'); }));
+    ['dragleave', 'drop'].forEach(evt =>
+      dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('dragover'); }));
+    dropzone.addEventListener('drop', async (e) => {
+      const f = e.dataTransfer.files[0];
+      if (!f) return;
+      await loadFile(f);
+    });
+
+    // Load button
+    loadBtn.onclick = async () => {
+      const f = fileInput.files[0];
+      if (!f) return alert('Please choose a CSV file.');
+      await loadFile(f);
+    };
+
+    async function loadFile(file) {
+      fileName = file.name || 'data.csv';
+      if (!fileName.toLowerCase().endsWith('.csv')) {
+        if (!confirm('This file does not look like a .csv. Continue?')) return;
+      }
+      const text = await file.text(); // reads entire file; for huge files (>~200MB) consider splitting or streaming
+      const all = parseCSV(text);
+      if (!all.length) return alert('No rows found.');
+      headers = all[0];
+      rows = all.slice(1);
+      fileInfoDiv.textContent = `Loaded: ${fileName} — ${rows.length.toLocaleString()} data rows, ${headers.length} columns`;
+      searchPanel.style.display = 'block';
+      renderColumns();
+      page = 0;
+      renderPreview();
+    }
+
+    function renderColumns() {
+      columnsDiv.innerHTML = '<h3>Columns to search</h3>';
+      let displayIndex = 0;
+      headers.forEach((h, i) => {
+        if ((h || '').toLowerCase().includes('early career')) return;
+        const id = `col_${i}`;
+        columnsDiv.innerHTML += `<label class="pill"><input type="checkbox" id="${id}" checked/> ${displayIndex}: ${escapeHtml(h || '(blank)')}</label>`;
+        displayIndex++;
+      });
+    }
+
+    function selectedColumns() {
+      const arr = [];
+      headers.forEach((_, i) => {
+        const el = document.getElementById(`col_${i}`);
+        if (el && el.checked) arr.push(i);
+      });
+      return arr;
+    }
+
+    function escapeHtml(s) {
+      return (s ?? '').toString().replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    }
+
+    // Build predicate based on keywords/mode/case
+    function buildPredicate() {
+      const raw = (keywordsEl.value || '').trim();
+      const mode = (matchModeEl.value || 'ANY').toUpperCase();
+      const caseSensitive = !!caseSensitiveEl.checked;
+      const earlyCareerOnly = !!earlyCareerToggleEl.checked;
+      const cols = selectedColumns();
+
+      let tokens = raw.length ? raw.split(',').map(t => t.trim()).filter(Boolean) : [];
+      if (!caseSensitive) tokens = tokens.map(t => t.toLowerCase());
+
+      const earlyCareerIdx = headers.findIndex(h => {
+        const normalized = (h || '').trim().toLowerCase();
+        return normalized === 'early career';
+      });
+
+      return function matches(row) {
+        if (earlyCareerOnly && earlyCareerIdx !== -1) {
+          const val = String(row[earlyCareerIdx] ?? '').trim().toLowerCase();
+          if (val !== 'true') return false;
+        }
+
+        if (!tokens.length) return true;
+        const cells = (cols.length ? cols.map(i => (row[i] ?? '')) : row)
+          .map(v => v == null ? '' : String(v));
+        const vs = caseSensitive ? cells : cells.map(v => v.toLowerCase());
+
+        if (mode === 'PHRASE') {
+          const phrase = tokens.join(' ');
+          return vs.some(v => v.includes(phrase));
+        }
+        if (mode === 'ALL') {
+          return tokens.every(t => vs.some(v => v.includes(t)));
+        }
+        // ANY (default)
+        return tokens.some(t => vs.some(v => v.includes(t)));
+      };
+    }
+
+    function renderPreview() {
+      // Show first page without filtering to give user a sense of data
+      const table = [];
+      table.push('<table><thead><tr>');
+      headers.forEach(h => table.push(`<th>${escapeHtml(h || '')}</th>`));
+      table.push('</tr></thead><tbody>');
+      const n = Math.min(10, rows.length);
+      for (let r = 0; r < n; r++) {
+        table.push('<tr>');
+        const row = rows[r];
+        for (let c = 0; c < headers.length; c++) {
+          table.push(`<td>${escapeHtml(row[c] ?? '')}</td>`);
+        }
+        table.push('</tr>');
+      }
+      table.push('</tbody></table>');
+      resultsDiv.innerHTML = table.join('');
+      statsDiv.innerHTML = `<span class="muted">Preview: showing first ${n} rows of ${rows.length.toLocaleString()}</span>`;
+      pagerDiv.innerHTML = '';
+    }
+
+    // Search & paginate
+    searchBtn.onclick = () => { page = 0; runSearch(); };
+    pageSizeEl.onchange = () => runSearch();
+
+    let lastMatched = []; // cache for export
+    function runSearch() {
+      const matches = buildPredicate();
+      lastMatched = [];
+      for (const row of rows) {
+        if (matches(row)) lastMatched.push(row);
+      }
+      const pageSize = parseInt(pageSizeEl.value || '100', 10);
+      const totalPages = Math.max(1, Math.ceil(lastMatched.length / pageSize));
+      page = Math.min(page, totalPages - 1);
+
+      // Build table
+      const table = [];
+      table.push('<table><thead><tr>');
+      headers.forEach(h => table.push(`<th>${escapeHtml(h || '')}</th>`));
+      table.push('</tr></thead><tbody>');
+      const start = page * pageSize;
+      const end = Math.min(start + pageSize, lastMatched.length);
+      for (let i = start; i < end; i++) {
+        table.push('<tr>');
+        const row = lastMatched[i];
+        for (let c = 0; c < headers.length; c++) {
+          table.push(`<td>${escapeHtml(row[c] ?? '')}</td>`);
+        }
+        table.push('</tr>');
+      }
+      table.push('</tbody></table>');
+      resultsDiv.innerHTML = table.join('');
+
+      // Stats & pager
+      statsDiv.innerHTML = `${lastMatched.length.toLocaleString()} matched rows (showing ${start + 1}-${end})`;
+      pagerDiv.innerHTML = `
+    <button ${page <= 0 ? 'disabled' : ''} onclick="page=0; runSearch()">⏮ First</button>
+    <button ${page <= 0 ? 'disabled' : ''} onclick="page=Math.max(0,page-1); runSearch()">◀ Prev</button>
+    <span>Page ${page + 1} of ${totalPages}</span>
+    <button ${page >= totalPages - 1 ? 'disabled' : ''} onclick="page=Math.min(${totalPages - 1},page+1); runSearch()">Next ▶</button>
+    <button ${page >= totalPages - 1 ? 'disabled' : ''} onclick="page=${totalPages - 1}; runSearch()">Last ⏭</button>
+  `;
+    }
+
+    // Export matched rows
+    exportBtn.onclick = () => {
+      if (!headers.length) return alert('No data loaded.');
+      const data = [headers, ...lastMatched];
+      const csv = toCSV(data);
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'filtered_rows.csv';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+
+    // Serialize arrays -> CSV
+    function toCSV(rowsArr) {
+      let out = '';
+      for (const row of rowsArr) {
+        const escaped = row.map(cell => {
+          let s = cell == null ? '' : String(cell);
+          // Escape quotes by doubling
+          s = s.replace(/"/g, '""');
+          // Quote if contains comma, quote, or newline
+          if (/[",\n]/.test(s)) s = `"${s}"`;
+          return s;
+        });
+        out += escaped.join(',') + '\n';
+      }
+      return out;
+    }
+  </script>
+</body>
+
+</html>
