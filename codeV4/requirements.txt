@@ -1,0 +1,6 @@
+pytest
+ads
+pandas
+python-dotenv
+os
+nltk
