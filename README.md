@@ -29,6 +29,7 @@ The routines, snippets, and main code were developed by NASA Headquarters intern
 * The [version 3](https://github.com/ninoc/ReviewerExtractor/tree/main/codeV3) was developed by Iizalaarab Elhaimeur and Sayem Kamal in 2024 and 2025.
 * The [LLM summarization model](https://github.com/ninoc/ReviewerExtractor/tree/main/LLM) was developed by Isabelle Hoare (2023), modified in Version 3.
 * The [GUIs](https://github.com/ninoc/ReviewerExtractor/tree/main/GUIs) were developed by Kaniyah Harris (2023), now superseded by the csv_keyword_finder.html .
+* The [version 4](https://github.com/ninoc/ReviewerExtractor/tree/main/codeV4) was developed and tested by Julia Husainzada and Darren Brodowy in 2026. **This is the most updated version of the code.** 
 
 # Code requirements
 The user needs an ADS API Access [Token](https://ui.adsabs.harvard.edu/help/api/), which enable unique users to access ADS. 
